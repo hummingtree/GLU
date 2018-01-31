@@ -25,18 +25,6 @@
 #define GLU_WFLOWFUNCS_H
 
 /**
-   @var MEAS_START
-   @brief at what point in the flow do we start measuring the topological stuff
-**/
-extern const double MEAS_START ;
-
-/**
-   @var TMEAS_STOP
-   @brief at what point in the flow do we intend to stop
-**/
-extern double TMEAS_STOP ;
-
-/**
    @var W0_STOP
    @brief what derivative value do we decide to (roughly) measure at
  */
@@ -47,14 +35,6 @@ extern const double W0_STOP ;
    @brief what flow value do we decide to (roughly) perform measurements at
  */
 extern const double T0_STOP ;
-
-/**
-   @fn void set_TMEAS_STOP( const double c0 )
-   @brief set the flow time we want to stop at
-   @param c0 :: scale setting parameter
- */
-void
-set_TMEAS_STOP( const double c0 ) ;
 
 /**
    @fn const double evaluate_scale( double *der , const double *x , const double *meas , const size_t Nmeas , const double scale ,	const char *message )
@@ -74,6 +54,15 @@ evaluate_scale( double *der ,
 		const size_t Nmeas ,
 		const double scale ,
 		const char *message ) ;
+
+/**
+   @fn void print_flow( const struct wfmeas *curr , const double err , const double delta_t)
+   @brief prints out the flow observable information
+ */
+void
+print_flow( const struct wfmeas *curr ,
+	    const double err ,
+	    const double delta_t) ;
 
 /**
    @fn void print_GG_info( void )
@@ -116,7 +105,7 @@ second_deriv( const double flow_prev ,
 	      const double delta_t ) ;
 
 /**
-   @fn void step_distance( struct site *__restrict lat , struct spt_site *__restrict lat2 , struct spt_site_herm *__restrict Z , const double rk1 , const double rk2 , const double rk3 , const smearing_types SM_TYPE , void (*project)( GLU_complex log[ NCNC ] , GLU_complex *__restrict staple , const GLU_complex link[ NCNC ] , const double smear_alpha ) )
+   @fn void step_distance( struct site *__restrict lat , struct s_site *__restrict lat2 , struct s_site_herm *__restrict Z , const double rk1 , const double rk2 , const double rk3 , const smearing_types SM_TYPE , void (*project)( GLU_complex log[ NCNC ] , GLU_complex *__restrict staple , const GLU_complex link[ NCNC ] , const double smear_alpha ) )
    @brief perform one rk4 wilson flow integration step
    @warning only SM_LOG and SM_STOUT available
    @param lat :: lattice gauge field
@@ -133,8 +122,8 @@ second_deriv( const double flow_prev ,
  */
 void
 step_distance( struct site *__restrict lat ,
-	       struct spt_site *__restrict lat2 ,
-	       struct spt_site_herm *__restrict Z ,
+	       struct s_site *__restrict lat2 ,
+	       struct s_site *__restrict Z ,
 	       const double rk1 ,
 	       const double rk2 , 
 	       const double rk3 ,
@@ -145,7 +134,7 @@ step_distance( struct site *__restrict lat ,
 					 const double smear_alpha ) ) ;
 
 /**
-   @fn void step_distance_memcheap( struct site *__restrict lat , struct spt_site *__restrict lat2 , struct spt_site *__restrict lat3 , struct spt_site *__restrict lat4 , struct spt_site_herm *__restrict Z , const double rk1 , const double rk2 , const double rk3 , const smearing_types SM_TYPE , void (*project)( GLU_complex log[ NCNC ] , GLU_complex *__restrict staple , const GLU_complex link[ NCNC ] , const double smear_alpha ) )
+   @fn void step_distance_memcheap( struct site *__restrict lat , struct s_site *__restrict lat2 , struct sp_site *__restrict lat3 , struct s_site *__restrict lat4 , struct s_site *__restrict Z , const double rk1 , const double rk2 , const double rk3 , const smearing_types SM_TYPE , void (*project)( GLU_complex log[ NCNC ] , GLU_complex *__restrict staple , const GLU_complex link[ NCNC ] , const double smear_alpha ) )
    @brief perform one rk4 wilson flow integration step
    @warning only SM_LOG and SM_STOUT available
    @param lat :: lattice gauge field
@@ -164,10 +153,10 @@ step_distance( struct site *__restrict lat ,
  */
 void
 step_distance_memcheap( struct site *__restrict lat ,
-			struct spt_site *__restrict lat2 ,
-			struct spt_site *__restrict lat3 ,
-			struct spt_site *__restrict lat4 ,
-			struct spt_site_herm *__restrict Z ,
+			struct s_site *__restrict lat2 ,
+			struct s_site *__restrict lat3 ,
+			struct s_site *__restrict lat4 ,
+			struct s_site *__restrict Z ,
 			const double rk1 ,
 			const double rk2 , 
 			const double rk3 , 

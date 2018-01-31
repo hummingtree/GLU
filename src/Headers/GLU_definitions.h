@@ -20,11 +20,52 @@
    @file GLU_definitions.h 
    @brief I needed somewhere to store all of the definitions I was using
  **/
-
 #ifndef GLU_DEFINITIONS_H
 #define GLU_DEFINITIONS_H
 
 #include "Mainfile.h"
+
+/**
+   @param NBLOCK
+   @brief loop unrolling factor for generic matrix multiplies
+ */
+#ifndef NBLOCK
+  #define NBLOCK 1
+#endif
+
+/**
+   @param NQMOMENTS
+   @brief number of topological moments we will compute
+ */
+#define NQMOMENTS ((size_t)12)
+
+/**
+   @param M_REPEAT
+   @brief macro-defined loop unrolling for the generic matrix 
+   multiplies
+ */
+#define M_REPEAT_1(X) X
+#define M_REPEAT_2(X) X X
+#define M_REPEAT_3(X) X X X
+#define M_REPEAT_4(X) M_REPEAT_2(X) M_REPEAT_2(X)
+#define M_REPEAT_5(X) X M_REPEAT_4(X)
+#define M_REPEAT_6(X) M_REPEAT_3(X) M_REPEAT_3(X)
+#define M_REPEAT_7(X) M_REPEAT_3(X) M_REPEAT_4(X)
+#define M_REPEAT_8(X) M_REPEAT_4(X) M_REPEAT_4(X)
+#define M_REPEAT_9(X) M_REPEAT_4(X) M_REPEAT_5(X)
+#define M_REPEAT_10(X) M_REPEAT_5(X) M_REPEAT_5(X)
+#define M_REPEAT_11(X) M_REPEAT_5(X) M_REPEAT_6(X)
+#define M_REPEAT_12(X) M_REPEAT_6(X) M_REPEAT_6(X)
+#define M_REPEAT_13(X) M_REPEAT_6(X) M_REPEAT_7(X)
+#define M_REPEAT_14(X) M_REPEAT_7(X) M_REPEAT_7(X)
+#define M_REPEAT_15(X) M_REPEAT_7(X) M_REPEAT_8(X)
+#define M_REPEAT_16(X) M_REPEAT_8(X) M_REPEAT_8(X)
+#define M_REPEAT_32(X) M_REPEAT_16(X) M_REPEAT_16(X)
+#define M_REPEAT_64(X) M_REPEAT_32(X) M_REPEAT_32(X)
+#define M_EXPAND(...) __VA_ARGS__
+#define M_REPEAT__(N, X) M_EXPAND(M_REPEAT_ ## N)(X)
+#define M_REPEAT_(N, X) M_REPEAT__(N, X)
+#define M_REPEAT(N, X) M_REPEAT_(M_EXPAND(N), X)
 
 /**
    @param OMP_FFTW
@@ -658,6 +699,22 @@ Defines for the gauge fixing routines ( Landau/{}.c )
 #endif
 #endif
 
+/**
+   @param WFLOW_TIME_STOP
+   @brief what flow time we stop at
+ */
+#ifndef WFLOW_TIME_STOP
+   #define WFLOW_TIME_STOP (20.0)
+#endif
+
+/**
+   @param WFLOW_MEAS_START
+   @brief where we start measuring flow t^2 E(t)
+ */
+#ifndef WFLOW_MEAS_START
+   #define WFLOW_MEAS_START (0.0)
+#endif
+
 /*******************************************************
   O(a^4) clover-improvement measure ( Fields/clover.c )
 ********************************************************/
@@ -760,14 +817,18 @@ Defines for the gauge fixing routines ( Landau/{}.c )
   #include <gsl/gsl_rng.h>
   #define RNG_TABLE 1
 #elif defined KISS_RNG
-  #define RNG_TABLE 4
+  #define RNG_TABLE 5
 #elif defined MWC_1038_RNG
   #define RNG_TABLE 1038
 #elif defined MWC_4096_RNG
   #define RNG_TABLE 4096
+#elif defined XOR_1024_RNG
+  #define RNG_TABLE 16
+#elif defined WELL_512_RNG
+  #define RNG_TABLE 16
 #else
-  #define WELL_RNG
-  #define RNG_TABLE 624
+  #define MWC_4096_RNG
+  #define RNG_TABLE 4096
 #endif
 
 /////

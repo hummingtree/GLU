@@ -164,7 +164,7 @@ compute_checksum( uint32_t *nersc_cksum ,
 		  uint32_t *milc_cksum31 , 
 		  uint32_t *scidac_cksum29 ,
 		  uint32_t *scidac_cksum31 ,
-		  const struct site *__restrict lat ,
+		  const struct site *lat ,
 		  const size_t LOOP_VAR ,
 		  const GLU_output checktype )
 {
@@ -274,7 +274,7 @@ copy_data( GLU_real *uout ,
 
 // writes the fields as binary data
 static void
-write_binary_data( const struct site *__restrict lat ,
+write_binary_data( const struct site *lat ,
 		   FILE *__restrict outfile ,
 		   const GLU_output checktype ,
 		   const size_t LATT_LOOP ,
@@ -320,7 +320,7 @@ write_binary_data_cheap( const struct site *__restrict lat ,
 
 // This is just the wrapping function for the writers
 int
-write_lat( struct site *__restrict lat , 
+write_lat( struct site *lat , 
 	   FILE *__restrict out , 
 	   const GLU_output type , 
 	   char *__restrict details )
@@ -334,8 +334,8 @@ write_lat( struct site *__restrict lat ,
 
   // loop variables
   size_t LOOP_VAR , LATT_LOOP ;
-  const GLU_output checktype = construct_loop_variables( 
-            &LATT_LOOP , &LOOP_VAR , type ) ;
+  const GLU_output checktype = \
+    construct_loop_variables( &LATT_LOOP , &LOOP_VAR , type ) ;
 
   // compute the checksums ...
   uint32_t nersc_cksum , milc_cksum29 , milc_cksum31 ;
@@ -369,13 +369,13 @@ write_lat( struct site *__restrict lat ,
   }
 
   // binary output is all the same for these types ...
-  const int SAFETY = have_memory_readers_writers( type ) ;
+  const int SAFETY = have_memory_readers_writers( checktype ) ;
   if( SAFETY != FAST ) {
     fprintf( stdout , "[IO] Using the slower/memory cheaper code \n" ) ;
-    write_binary_data_cheap( lat , out , type , LOOP_VAR ) ;
+    write_binary_data_cheap( lat , out , checktype , LOOP_VAR ) ;
   } else {
     fprintf( stdout , "[IO] Using the faster/memory expensive code \n" ) ;
-    write_binary_data( lat , out , type , LATT_LOOP , LOOP_VAR ) ;
+    write_binary_data( lat , out , checktype , LATT_LOOP , LOOP_VAR ) ;
   }
 
   // need to write out the scidac checksums here

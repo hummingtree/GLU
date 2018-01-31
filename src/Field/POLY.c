@@ -75,7 +75,7 @@ poly( const struct site *__restrict lat ,
     small_poly( poly , lat , k , dir , Latt.dims[dir] ) ;
     sum = sum + (double complex)trace( poly ) ;
   }
-  return sum ;
+  return sum / subvolume ;
 }
 
 // If we have FFTW we use it for the convolutions instead of our slow
@@ -198,7 +198,7 @@ static_quark_correlator( double complex *__restrict result ,
 
   // create some plans
   fftw_plan forward , backward ;
-  small_create_plans_DFT( &forward , &backward , in , out , ND-1 ) ;
+  small_create_plans_DFT( &forward , &backward , in , out , Latt.dims , ND-1 ) ;
 
   size_t t ;
   for( t = 0 ; t < Latt.dims[ ND - 1 ] ; t++ ) {
@@ -351,9 +351,9 @@ Coul_staticpot( struct site *__restrict lat ,
   fprintf( stdout , "[STATIC-POTENTIAL] writing output file to %s \n" , str ) ;
 
   // write out the size of the timeslices we are looking at
-  size_t Tcorrs[1] = { T-1 } ;
+  uint32_t Tcorrs[1] = { T-1 } ;
   if( !WORDS_BIGENDIAN ) { bswap_32( 1 , Tcorrs ) ; }
-  fwrite( Tcorrs , sizeof(int) , 1 , Ap ) ;
+  fwrite( Tcorrs , sizeof(uint32_t) , 1 , Ap ) ;
   if( !WORDS_BIGENDIAN ) { bswap_32( 1 , Tcorrs ) ; }  
 
   // allocate the results

@@ -55,12 +55,12 @@ Amu_fields( struct site *__restrict A ,
 
 #pragma omp parallel for private(i)
   PFOR( i = 0 ; i < LVOLUME ; i++ ) { 
-    struct spt_site temp ;
+    GLU_complex temp[ NCNC ] GLUalign ;
     size_t mu ;
     for( mu = 0 ; mu < ND ; mu++ ) {
-      log( temp.O[mu] , A[i].O[mu] ) ;
+      log( temp , A[i].O[mu] ) ;
+      equiv( A[i].O[mu] , temp ) ;
     }
-    memcpy( &A[i] , &temp , sizeof( struct spt_site ) ) ;
   }
   return GLU_SUCCESS ;
 }
@@ -112,11 +112,11 @@ spatial_correlator( struct site *__restrict A ,
 
   // FFTW routines
   GLU_complex *out = fftw_malloc( LVOLUME * sizeof( GLU_complex ) ) ;
-  GLU_complex *in = fftw_malloc( LVOLUME * sizeof( GLU_complex ) ) ;
+  GLU_complex *in  = fftw_malloc( LVOLUME * sizeof( GLU_complex ) ) ;
 
   // create some plans
   fftw_plan forward , backward ;
-  small_create_plans_DFT( &forward , &backward , in , out , ND ) ;
+  small_create_plans_DFT( &forward , &backward , in , out , Latt.dims , ND ) ;
 
   //forward transform
   size_t mu , i , j ;

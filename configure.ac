@@ -50,7 +50,7 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_LANG([C]) 
 AC_PROG_RANLIB ## include a check for libtool if not use ranlib?
-##AM_PROG_AR
+AM_PROG_AR
 AC_C_BIGENDIAN 
 
 ## SET up the m4
@@ -527,11 +527,13 @@ AC_ARG_WITH([RNG],
 	    case ${with_RNG} in
 	    KISS_RNG) AC_DEFINE([KISS_RNG],[],[Keep It Simple Stupid RNG (JKISS32)]) ;;
 	    MWC_1038_RNG) AC_DEFINE([MWC_1038_RNG],[],[Multiply With Carry (1038) selection]) ;;
-	    MWC_4096_RNG) AC_DEFINE([MWC_1038_RNG],[],[Multiply With Carry (4096) selection]) ;;
+	    MWC_4096_RNG) AC_DEFINE([MWC_4096_RNG],[],[Multiply With Carry (4096) selection]) ;;
+	    XOR_1024_RNG) AC_DEFINE([XOR_1024_RNG],[],[XOR (1024) selection]) ;;
 	    GSL) AC_DEFINE([GSL_RNG],[],[GSL default (Mersenne Twister) selection]) ;;
-	    *) AC_MSG_NOTICE([Defaulting to the Well19937a RNG]) ;;
+	    WELL_512_RNG) AC_DEFINE([WELL_512_RNG],[],[Well (512) rng selection]) ;;
+	    *) AC_MSG_NOTICE([Defaulting to the MWC_4096_RNG]) ;;
 	    esac
-	    ],[ AC_MSG_NOTICE([Defaulting to the Well19937a RNG]) ])
+	    ],[ AC_MSG_NOTICE([Defaulting to the MWC_4096_RNG]) ])
 
 ## enable the searching for the best gribov copies
 AC_ARG_WITH([LUXURY_GAUGE],
@@ -544,6 +546,78 @@ AC_ARG_WITH([LUXURY_GAUGE],
 	    AC_DEFINE_UNQUOTED([LUXURY_GAUGE],[$with_LUXURY_GAUGE],[Generated Gribov copies.]) 
 	    else ## default to 20
 	    AC_DEFINE([LUXURY_GAUGE],[20],[Generated Gribov copies.]) 
+	    fi
+	    ],[])
+
+## enable the searching for the best gribov copies
+AC_ARG_WITH([NBLOCK],
+	AC_HELP_STRING([--with-NBLOCK=],
+		       [Innermost loop unrolling factor for matrix multiplies.]),
+            [
+	    ## if the user has left blank we give it a default value of 1
+	    if test "$with_NC" -gt 3 ; then
+	       if test "x$with_NBLOCK" != "xyes" ; then
+	       	  if test $with_NBLOCK -gt $with_NC ; then
+		     AC_MSG_ERROR([NBLOCK of ${with_NBLOCK} cannot be greater than SU($with_NC).])
+		  else
+		     let 'check_odd=with_NC%2'
+	       	     if test $check_odd = 1 ; then
+	                let 'check=(with_NC-1)%with_NBLOCK'
+	       	     else
+		        let 'check=with_NC%with_NBLOCK'
+	       	     fi  
+	       	     if test $check != 0 ; then
+	                AC_MSG_ERROR([NBLOCK of ${with_NBLOCK} not a factor of SU($with_NC).])
+	       	     else
+		        AC_MSG_NOTICE([Performing ${with_NBLOCK} inner loop unrolling.])
+		        AC_DEFINE_UNQUOTED([NBLOCK],[$with_NBLOCK],[Loop unrolling factor.])	
+	       	    fi
+		 fi
+	       else ## default to 1 which is no loop unrolling
+	       	  AC_DEFINE([NBLOCK],[1],[No loop unrolling.]) 
+	       fi
+	    else
+		if test "x$with_NBLOCK" != "xyes" ; then
+	       	   AC_MSG_NOTICE([Using default inline matrix routines. Ignoring blocking factor.])
+		fi
+	    fi	    
+	    ],[])
+
+## only timing the gradient flow
+AC_ARG_ENABLE([WFLOW_TIME_ONLY],
+	[ --enable-WFLOW_TIME_ONLY ],
+	[case "${enableval}" in
+	yes) AC_MSG_NOTICE([Only timing the gradient flow])	
+	     AC_DEFINE([WFLOW_TIME_ONLY],[],[Only timing the gradient flow])
+	     ;;
+	*) AC_MSG_ERROR([bad value ${enableval} for --enable-WFLOW_TIME_ONLY]) ;;
+	esac
+	],[])
+	
+
+## what time to stop the wflow
+AC_ARG_WITH([WFLOW_TIME_STOP],
+	AC_HELP_STRING([--with-WFLOW_TIME_STOP=],
+		       [Specify at what time you want the flow to stop]),
+            [
+	    if test "x$with_WFLOW_TIME_STOP" != "xyes" ; then
+	        AC_MSG_NOTICE([Stopping flow at t=${with_WFLOW_TIME_STOP}.])
+	        AC_DEFINE_UNQUOTED([WFLOW_TIME_STOP],[$with_WFLOW_TIME_STOP],[Wilson flow maximum time stopping condition.])
+	    else
+		AC_MSG_NOTICE([If you want to use WFLOW_TIME_STOP you should specify a stopping time.])
+	    fi
+	    ],[])
+
+## what time to stop the wflow
+AC_ARG_WITH([WFLOW_MEAS_START],
+	AC_HELP_STRING([--with-WFLOW_MEAS_START=],
+		       [Specify at what time you want to start measuring flow observables]),
+            [
+	    if test "x$with_WFLOW_MEAS_START" != "xyes" ; then
+	        AC_MSG_NOTICE([Measuring from t=${with_WFLOW_MEAS_START}.])
+	        AC_DEFINE_UNQUOTED([WFLOW_MEAS_START],[$with_WFLOW_MEAS_START],[Wflow observable measurements start from here])
+	    else
+		AC_MSG_NOTICE([If you want to use WFLOW_MEAS_START you should specify a starting time.])
 	    fi
 	    ],[])
 

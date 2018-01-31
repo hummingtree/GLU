@@ -78,7 +78,6 @@ all_staples( GLU_complex stap[ NCNC ] ,
       multab_suNC( b , a , lat[ b2 ].O[nu] ) ; 
       a_plus_b( stap , b ) ; 
     } break ;
-    break ;
   }
   return ;
 }
@@ -97,7 +96,7 @@ all_staples_improve( GLU_complex stap[ NCNC ] ,
   GLU_complex c0_stap[ NCNC ] GLUalign , c1_stap[ NCNC ] GLUalign ;
   GLU_complex tempstap[ NCNC ] GLUalign ;
 
-  zero_mat( c1_stap ) ; zero_mat( c1_stap ) ;
+  zero_mat( c0_stap ) ; zero_mat( c1_stap ) ;
 
 #ifdef SYMANZIK_ONE_LOOP
   GLU_complex c2_stap[ NCNC ] ;
@@ -132,7 +131,7 @@ all_staples_improve( GLU_complex stap[ NCNC ] ,
 	exact_log_slow( b , a ) ; 
       }
       a_plus_b( c0_stap , b ) ;
-
+ 
       // IMPROVEMENT factors
       // this is the ( nu , nu , mu , -nu , -nu )
       //
@@ -220,7 +219,7 @@ all_staples_improve( GLU_complex stap[ NCNC ] ,
 	multab_dag( b , tempstap , lat[ tf3 ].O[mu] ) ;
       }
       a_plus_b( c1_stap , b ) ;
-
+      
       //// The horizontal, backwards contribution
       //
       // x-->--x-->--x       x--<--x==<==x

@@ -21,7 +21,6 @@
    @brief includes all of the struct definitions dotted around the code
    I put all of the struct definitions in here ...
  **/
-
 #ifndef GLU_TYPES_H
 #define GLU_TYPES_H
 
@@ -51,6 +50,9 @@ struct latt_info {
   header_mode head ;// Which header type are we using
   uint32_t Seed[ 1 ] ; // rng seed, inbuilt KISS uses four of these
   double twiddles[ ND ] ; // fourier transform twiddles
+  uint32_t Nthreads ; // number of threads
+  struct su2_subgroups *su2_data ; // su2 subgroups
+  cline_arg argc ; // command line arguments
 } ;
 
 /**
@@ -69,70 +71,18 @@ struct QCDheader {
    @brief the gauge field format
  */
 struct site {
-  GLU_complex O[ ND ][ NCNC ] ;
+  GLU_complex **O ;
   int neighbor[ ND ] ;
   int back[ ND ] ;
 } ;
 
 /**
-   @struct sp_site
-   @brief spatial site format
+   @struct s_site
+   @brief new format
  */
-struct sp_site {
-  GLU_complex O[ ND - 1 ][ NCNC ] ;
+struct s_site {
+  GLU_complex **O ;
 } ;
-
-/**
-   @struct spt_site
-   @brief gauge link format
- */
-struct spt_site {
-  GLU_complex O[ ND ][ NCNC ] ;
-} ;
-
-/**
-   @struct spt_site_herm
-   @brief specifically for the Wilson flow
- */
-struct spt_site_herm {
-  #if NC == 3
-  GLU_complex O[ ND ][ HERMSIZE - 1 ] ;
-  #else
-  GLU_complex O[ ND ][ HERMSIZE ] ;
-  #endif
-} ;
-
-/**
-   @struct sp_site_herm
-   @brief specifically for the CGF
- */
-struct sp_site_herm {
-  GLU_complex O[ ND-1 ][ HERMSIZE ] ;
-} ;
-
-/**
-   @struct lv1
-   @param the "level1" dressed links for HYP smearing
- */
-struct lv1 {
-  GLU_complex O[ ND * ( ND - 1 ) ][ NCNC ] ;
-} ; 
-
-/**
-   @struct smallest_lv1
-   @param the "level1" dressed links for HYP smearing shortened using the 8 parameter link definition
- */
-struct smallest_lv1 {
-  GLU_real O[ ND * ( ND - 1 ) ][ NCNC - 1 ] ;
-} ; 
-
-/**
-   @struct spatial_lv1
-   @param the "level1" dressed links for HYP smearing in spatial directions only
- */
-struct spatial_lv1 {
-  GLU_complex O[ ( ND - 1 ) * ( ND - 2 ) ][ NCNC ] ;
-} ; 
 
 /**
    @struct veclist
@@ -210,6 +160,15 @@ struct cut_info {
 } ;
 
 /**
+   @struct draughtboard
+ */
+struct draughtboard {
+  size_t **square ;
+  size_t *Nsquare ;
+  size_t Ncolors ;
+} ;
+
+/**
    @struct sm_info
    @brief smearing information storage
    @param dir :: spatial or temporal smearing is allowed
@@ -220,6 +179,19 @@ struct sm_info {
   GLU_smeardir dir ; // direction ND or ND - 1
   size_t smiters ; // number of smearing iterations
   smearing_types type ; // type of smearing
+} ;
+
+/**
+   @struct hb_info
+   @brief heatbath information storage
+ */
+struct hb_info {
+  double beta ;
+  size_t iterations ;
+  size_t Nmeasure ;
+  size_t Nor ;
+  size_t Nsave ;
+  size_t therm ;
 } ;
 
 /**
@@ -245,7 +217,6 @@ struct head_data {
 /**
    @struct u1_info
    @brief information on the U1-ification of the gauge fields
-
    @param alpha :: the noncompact QED coupling strength
    @param charge :: the sign of the QED charge
    @param meas :: the U(1) measurement being made
@@ -261,8 +232,9 @@ struct u1_info {
    @brief one struct to rule them all 
  */
 struct infile_data {
-  struct gf_info GFINFO ;
   struct cut_info CUTINFO ;
+  struct gf_info GFINFO ;
+  struct hb_info HBINFO ;
   struct sm_info SMINFO ;
   struct u1_info U1INFO ;
   header_mode head ;
@@ -270,6 +242,12 @@ struct infile_data {
   GLU_bool rtrans ;
   char output_details[ 64 ] ;
   GLU_output storage ;
+} ;
+
+// topological moments calculator
+struct Qmoments {
+  double *Q ;
+  double *Q2 ;
 } ;
 
 #endif

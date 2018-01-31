@@ -16,7 +16,6 @@
     You should have received a copy of the GNU General Public License
     along with GLU.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 /**
    @file Mainfile.c
    @brief the driver for the rest of the code
@@ -32,9 +31,6 @@
 // Lattice geometry is an important global, used everywhere
 struct latt_info Latt ;
 
-// enum for the modes we support
-enum{ HELP = 1 , INPUT_FILE = 2 , READ = 4 , WRITE = 6 } ;
-
 // main file
 int 
 main( const int argc ,
@@ -48,6 +44,9 @@ main( const int argc ,
   // bit of control here 
   if( argc < READ || !(argc%2) ) { return GLUsage() ; }
 
+  // set this
+  Latt.argc = argc ;
+
   // initialise GLU, its so sticky
   attach_GLU( ) ;
 
@@ -55,12 +54,6 @@ main( const int argc ,
   struct infile_data infile_struct ;
   if( get_input_data( &infile_struct , argv[ INPUT_FILE ] ) == GLU_FAILURE ) {
     return GLU_FAILURE ;
-  }
-
-  // sanitise
-  if( argc < WRITE ) {
-    sprintf( infile_struct.output_details , " " ) ;
-    infile_struct.storage = NO_OUTPUT ;
   }
 
   // and make the input data constant
@@ -82,6 +75,10 @@ main( const int argc ,
   case MODE_CROSS_U1 :
     read_and_U1( argv[ READ ] , INFILE.rtrans , INFILE.U1INFO ,
 		 argv[ WRITE ] , INFILE.storage , INFILE.output_details ) ;
+    break ;
+  case MODE_HEATBATH :
+    heatbath( argv[ READ ] , INFILE.HBINFO , INFILE.head , argv[ WRITE ] , 
+	      INFILE.storage , INFILE.output_details ) ;
     break ;
   default :
     read_and_check( argv[ READ ] , INFILE.rtrans , argv[ WRITE ] , 

@@ -131,7 +131,7 @@ line_search_Coulomb( GLU_complex *__restrict *__restrict gtransformed ,
 // bit that calculates the steepest ascent with fourier acceleration
 static void
 steep_deriv_CG( GLU_complex *__restrict *__restrict in ,
-		struct sp_site_herm *__restrict rotato ,
+		struct s_site *__restrict rotato ,
 		const struct site *__restrict lat , 
 		const GLU_complex *__restrict *__restrict slice_gauge , 
 		const size_t t ,
@@ -239,7 +239,7 @@ steep_step_SD( const struct site *__restrict lat ,
 	       GLU_complex *__restrict *__restrict slice_gauge , 
 	       GLU_complex *__restrict *__restrict out , 
 	       GLU_complex *__restrict *__restrict in , 
-	       struct sp_site_herm *__restrict rotato ,
+	       struct s_site *__restrict rotato ,
 	       GLU_complex *__restrict *__restrict gtransformed , 
 	       const void *__restrict forward , 
 	       const void *__restrict backward , 
@@ -274,7 +274,7 @@ steep_step_FACG( const struct site *__restrict lat ,
 		 GLU_complex *__restrict *__restrict in , 
 		 GLU_complex *__restrict *__restrict in_old ,
 		 GLU_complex *__restrict *__restrict sn ,
-		 struct sp_site_herm *__restrict rotato ,
+		 struct s_site *__restrict rotato ,
 		 GLU_complex *__restrict *__restrict gtransformed ,
 		 const void *__restrict forward , 
 		 const void *__restrict backward , 
@@ -396,7 +396,7 @@ steep_fix_FACG( const struct site *__restrict lat ,
 		GLU_complex *__restrict *__restrict in , 
 		GLU_complex *__restrict *__restrict in_old ,
 		GLU_complex *__restrict *__restrict sn , 
-		struct sp_site_herm *__restrict rotato ,
+		struct s_site *__restrict rotato ,
 		GLU_complex *__restrict *__restrict gtransformed , 
 		const void *__restrict forward , 
 		const void *__restrict backward , 
@@ -490,12 +490,7 @@ Coulomb_FACG( struct site  *__restrict lat ,
   GLU_complex **gt = NULL , **g = NULL , 
     **g_end = NULL , **g_up  = NULL ;
   GLU_complex **sn = NULL , **in_old = NULL ; // CG temporaries
-
-  // allocate rotato
-  struct sp_site_herm *rotato = NULL ; 
-
-  // allocate traces
-  allocate_traces( LCU ) ;
+  struct s_site *rotato = NULL ;
 
   // flag for if something goes wrong
   size_t tot_its = 0 ;
@@ -510,14 +505,21 @@ Coulomb_FACG( struct site  *__restrict lat ,
 	GLU_complex* gt_matrices = (GLU_complex*)malloc( gt_size*sizeof(GLU_complex) );
 	printf("[GF] Finished allocating space for gauge fixing matrices.\n");
 
+  // allocate rotato
+  if( ( rotato = allocate_s_site( LCU , ND-1 , HERMSIZE ) ) == NULL ) {
+    goto memfree ;
+  }
+
+  // allocate traces
+  allocate_traces( LCU ) ;
+
   // temporary field allocations
   if( GLU_malloc( (void**)&gt     , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&g      , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&g_end  , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&g_up   , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&sn     , ALIGNMENT , TRUE_HERM * sizeof( GLU_complex* ) ) != 0 ||
-      GLU_malloc( (void**)&in_old , ALIGNMENT , TRUE_HERM * sizeof( GLU_complex* ) ) != 0 ||
-      GLU_malloc( (void**)&rotato , ALIGNMENT , LCU * sizeof( struct sp_site_herm ) ) != 0 ) {
+      GLU_malloc( (void**)&in_old , ALIGNMENT , TRUE_HERM * sizeof( GLU_complex* ) ) != 0 ) {
     goto memfree ;
   }
 
@@ -652,7 +654,7 @@ Coulomb_FACG( struct site  *__restrict lat ,
       free( in_old[i] ) ;
     }
   }
-  free( rotato ) ;
+  free_s_site( rotato , LCU , ND-1 , HERMSIZE ) ;
   free( in_old );
   free( sn     ) ;
   free_traces( ) ;
@@ -673,13 +675,13 @@ Coulomb_FACG( struct site  *__restrict lat ,
   if( g_up != NULL ) {
 #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i ++  ) {
-      free( g_up[i]     ) ; 
+      free( g_up[i]  ) ; 
     }
   }
   if( g_end != NULL ) {
 #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i ++  ) {
-      free( g_end[i]     ) ; 
+      free( g_end[i] ) ; 
     }
   }
   free( gt    ) ;
@@ -697,7 +699,7 @@ steep_fix_FA( const struct site *__restrict lat ,
 	      GLU_complex *__restrict *__restrict slice_gauge , 
 	      GLU_complex *__restrict *__restrict out , 
 	      GLU_complex *__restrict *__restrict in , 
-	      struct sp_site_herm *__restrict rotato ,
+	      struct s_site *__restrict rotato ,
 	      const void *__restrict forward , 
 	      const void *__restrict backward , 
 	      const GLU_real *__restrict psq , 
@@ -768,30 +770,26 @@ Coulomb_FASD( struct site  *__restrict lat ,
 {
   // allocations 
   GLU_complex **g = NULL , **g_end = NULL , **g_up  = NULL ;
-
-  // allocate rotato
-  struct sp_site_herm *rotato = NULL ;
+  struct s_site *rotato = NULL ;
 
   // flag for whether it succeeded or not
   size_t tot_its = 0 ;
 
-  // allocate traces
-  allocate_traces( LCU ) ;
-
   // initialise loop counter and timeslice index
   size_t i , t = 0 ;
 
-	// TODO: Added by Jackson. We want the gauge transformation matrices.
-	printf("Allocating space for gauge fixing matrices.\n");
-	long gt_size = Latt.dims[ND-1] * LCU * NCNC;
-	GLU_complex gt_matrices[gt_size];
+  // allocate rotato
+  if( ( rotato = allocate_s_site( LCU , ND-1 , HERMSIZE ) ) == NULL ) {
+    goto memfree ;
+  }
 
+  // allocate traces
+  allocate_traces( LCU ) ;
 
   // allocate temporary gauge transformation matrices
   if( GLU_malloc( (void**)&g      , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&g_end  , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
-      GLU_malloc( (void**)&g_up   , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
-      GLU_malloc( (void**)&rotato , ALIGNMENT , LCU * sizeof( struct sp_site_herm ) ) != 0 ) {
+      GLU_malloc( (void**)&g_up   , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ) {
     fprintf( stderr , "[GF] CFASD temporary gauge fields allocation failure\n" ) ;
     goto memfree ;
   }
@@ -869,17 +867,10 @@ Coulomb_FASD( struct site  *__restrict lat ,
   gtransform_slice( (const GLU_complex**)g , lat , 
 		    (const GLU_complex**)g_end , t - 1 ) ; 
 
-	char gt_matrices_stem[1024];
-	sprintf(gt_matrices_stem, "gf_matrices_COULOMB.%d", Latt.flow);
-	printf("%s\n", gt_matrices_stem);
-	FILE* gt_matrices_output = fopen(gt_matrices_stem, "w");
-	fwrite((void*)gt_matrices, gt_size*sizeof(GLU_complex), 1, gt_matrices_output);
-	fclose(gt_matrices_output);
- 
  memfree :
 
   // free the temporary transformation matrix, that I called rotato
-  free( rotato ) ;
+  free_s_site( rotato , LCU , ND-1 , HERMSIZE ) ;
 
   // and free the traces
   free_traces( ) ;
@@ -894,13 +885,13 @@ Coulomb_FASD( struct site  *__restrict lat ,
   if( g_up != NULL ) {
 #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i ++  ) {
-      free( g_up[i]     ) ; 
+      free( g_up[i]  ) ; 
     }
   }
   if( g_end != NULL ) {
 #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i ++  ) {
-      free( g_end[i]     ) ; 
+      free( g_end[i] ) ; 
     }
   }
   free( g     ) ; 

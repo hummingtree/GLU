@@ -14,11 +14,12 @@ CUTSFILES=./Cuts/3Dcuts.c ./Cuts/config_gluons.c ./Cuts/cut_output.c \
 
 ## plaquettes, traces, field strength tensor
 FIELDFILES=./Field/clover.c ./Field/plaqs_links.c ./Field/POLY.c \
-	./Field/Qsusc.c
+	./Field/Qcorr.c ./Field/Qmoments.c ./Field/Qslab.c ./Field/Qsusc.c 
 
 ## geometry, fft planning
 GEOMETRYFILES=./Geometry/BPST_config.c ./Geometry/geometry.c \
-	./Geometry/plan_ffts.c ./Geometry/random_config.c
+	./Geometry/init.c ./Geometry/plan_ffts.c ./Geometry/random_config.c \
+	./Geometry/draughtboard.c
 
 ## file readers and writers
 IOFILES=./IO/chklat_stuff.c ./IO/crc.c ./IO/HIREP.c ./IO/input_help.c \
@@ -37,8 +38,8 @@ MATRIXOPSFILES=./Matrix_Ops/effs.c ./Matrix_Ops/evalues.c \
 	./Matrix_Ops/exactQ.c ./Matrix_Ops/expMat.c \
 	./Matrix_Ops/givens.c \
 	./Matrix_Ops/gramschmidt.c ./Matrix_Ops/gramschmidt_SSE.c \
-	./Matrix_Ops/invert.c ./Matrix_Ops/lie_mats.c \
-	./Matrix_Ops/LU.c ./Matrix_Ops/LU_SSE.c \
+	./Matrix_Ops/invert.c ./Matrix_Ops/invert_SSE.c \
+	./Matrix_Ops/lie_mats.c ./Matrix_Ops/LU.c ./Matrix_Ops/LU_SSE.c \
 	./Matrix_Ops/taylor_logs.c \
 	./Matrix_Ops/trace_abc.c ./Matrix_Ops/trace_abc_SSE.c \
 	./Matrix_Ops/U_Nops.c ./Matrix_Ops/vandermonde.c
@@ -64,11 +65,15 @@ SMEARFILES=./Smear/4D_fast.c ./Smear/adaptive_flow.c ./Smear/HYP.c \
 ## quenched U1
 U1FILES=./U1/SUNCxU1_config.c ./U1/U1_obs.c ./U1/U1_top.c
 
+## quenched update
+UPDATEFILES=./Update/KPHB.c ./Update/relax.c ./Update/hb.c \
+	./Update/SU2_rotate.c ./Update/SU2_rotate_SSE.c
+
 ## utilities: memory checking, rngs splines byte swapping
-UTILSFILES=./Utils/GLU_bswap.c ./Utils/GLU_memcheck.c ./Utils/GLU_rng.c \
-	./Utils/GLU_splines.c ./Utils/GLU_timer.c ./Utils/KISS_rng.c \
-	./Utils/MWC_1038.c ./Utils/MWC_4096.c \
-	./Utils/well_rng_19937a.c ./Utils/GLU_malloc.c ./Utils/GLU_sums.c
+UTILSFILES=./Utils/GLU_bswap.c ./Utils/GLU_malloc.c ./Utils/GLU_memcheck.c \
+	./Utils/GLU_splines.c ./Utils/GLU_sums.c ./Utils/GLU_timer.c \
+	./Utils/par_KISS.c ./Utils/par_MWC_1038.c ./Utils/par_MWC_4096.c \
+	./Utils/par_rng.c ./Utils/par_WELL_512.c ./Utils/par_XOR_1024.c
 
 ## wrapper files
 WRAPPERSFILES=./Wrappers/CUT_wrap.c ./Wrappers/GF_wrap.c \
@@ -85,6 +90,7 @@ libGLU_a_SOURCES = \
 	${MMULFILES} \
 	${SMEARFILES} \
 	${U1FILES} \
+	${UPDATEFILES} \
 	${UTILSFILES} \
 	${WRAPPERSFILES}
 
@@ -98,6 +104,7 @@ include_HEADERS =
 	$(MATRIXOPSFILES:./Matrix_Ops/%.c=./Headers/%.h) \
 	$(MMULFILES:./Matrix_Ops/MMUL/%.c=./Headers/%.h) \
 	$(U1FILES:./U1/%.c=./Headers/%.h) \
+	$(UPDATEFILES:./Update/%.c=./Headers/%.h) \
 	$(UTILSFILES:./Utils/%.c=./Headers/%.h) \
 	$(WRAPPERSFILES:./Wrappers/%.c=./Headers/%.h) \
 	./Headers/Mainfile.h \

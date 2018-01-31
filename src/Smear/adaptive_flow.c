@@ -26,16 +26,11 @@
 
 #include "Mainfile.h"
 
-#include "geometry.h"     // init_navig is called for the temporary
 #include "GLU_splines.h"  // cubic_eval and derivative calculation
+#include "init.h"         // init_navig is called for the temporary
 #include "plaqs_links.h"  // clover and plaquette measurements
 #include "projectors.h"   // smearing projections
 #include "wflowfuncs.h"   // wilson flow general routines
-
-// enable this if we are doing a straight shot for a specific time
-// to avoid measuring the topological charge and clover and all that,
-// be careful when T > 10, will need to increase ADAPTIVE_EPS
-//#define TIME_ONLY
 
 /**
    @fn static inline double adaptfmax( const double a , const double b )
@@ -61,22 +56,6 @@ adaptfmin( const double a , const double b )
 }
 
 /**
-   @brief print the flow progress
- */
-static void
-print_flow( const struct wfmeas *curr ,
-	    const double err ,
-	    const double delta_t)
-{
-  if( delta_t < 0 ) {
-    printf( "[WFLOW-TSTOP] {err} %1.3e {t} %f {dt} %g " , err , curr -> time , delta_t ) ;
-  } else {
-    printf( "[WFLOW] {err} %1.3e {t} %f {dt} %g " , err , curr -> time , delta_t ) ;
-  }
-  printf( "{p} %g {q} %g {Gt} %g \n" , curr -> avplaq , curr -> qtop , curr -> Gt ) ;
-}
-
-/**
    @enum adaptive_control
    @brief when to break our adaptive algorithm if we have done this many halvings and still have no result
  */
@@ -87,10 +66,10 @@ enum adaptive_control{ ADAPTIVE_BIG_NUMBER = 20 } ;
  */
 static struct wfmeas *
 fine_measurement( struct site *lat , 
-		  struct spt_site *lat2 , 
-		  struct spt_site *lat3 , 
-		  struct spt_site *lat4 , 
-		  struct spt_site_herm *Z , 
+		  struct s_site *lat2 , 
+		  struct s_site *lat3 , 
+		  struct s_site *lat4 , 
+		  struct s_site *Z , 
 		  double *flow_next , 
 		  double *t , 
 		  const double delta_t ,
@@ -126,14 +105,11 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
 		    const int SIGN ,
 		    const smearing_types SM_TYPE )
 {  
-  // set this for the coupling measurement
-  //set_TMEAS_STOP( 0.4 ) ;
-
   ////// USUAL STARTUP INFORMATION /////////
   print_GG_info( ) ;
 
   // the error between the two plaquettes
-  const double ADAPTIVE_EPS = 1E-7 ;
+  const double ADAPTIVE_EPS = 1E-6 ;
   // Standard shrink and factor from NRC RK4
   const double ADAPTIVE_SHRINK = -0.32 ; // 0.33?
   // Standard growth and factor from NRC RK4
@@ -157,10 +133,6 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
   fprintf( stdout , "[WFLOW] Fine step :: %g \n\n" , FINESTEP ) ;
 
   //////////////////////////////////////////
-  struct spt_site_herm *Z = NULL ;
-  struct spt_site *lat2 = NULL , *lat3 = NULL , *lat4 = NULL ;
-  struct site *lat_two = NULL ;
-
   void (*project) ( GLU_complex log[ NCNC ] , 
 		    GLU_complex *__restrict staple , 
 		    const GLU_complex link[ NCNC ] , 
@@ -178,26 +150,22 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
     return GLU_FAILURE ;
   }
 
-  if( GLU_malloc( (void**)&Z , ALIGNMENT , LVOLUME * sizeof( struct spt_site_herm ) ) != 0 ||
-      GLU_malloc( (void**)&lat2 , ALIGNMENT , LCU * sizeof( struct spt_site ) )       != 0 ||
-      GLU_malloc( (void**)&lat_two , ALIGNMENT , LVOLUME * sizeof( struct site ) )    != 0 ) {
+  // allocate these
+  struct s_site *lat2 = NULL , *lat3 = NULL , *lat4 = NULL , *Z = NULL ;
+  struct site *lat_two = NULL ;
+  if( ( lat_two = allocate_lat( ) ) == NULL ||
+      ( Z    = allocate_s_site( LVOLUME , ND , TRUE_HERM ) ) == NULL ||
+      #ifdef IMPROVED_SMEARING
+      ( lat3 = allocate_s_site( 2*LCU , ND , NCNC ) ) == NULL ||
+      ( lat4 = allocate_s_site( 2*LCU , ND , NCNC ) ) == NULL ||
+      #else
+      ( lat3 = allocate_s_site( LCU , ND , NCNC ) ) == NULL ||
+      ( lat4 = allocate_s_site( LCU , ND , NCNC ) ) == NULL ||
+      #endif
+      ( lat2 = allocate_s_site( LCU , ND , NCNC ) ) == NULL ) {
     fprintf( stderr , "[SMEARING] allocation failure \n" ) ;
     return GLU_FAILURE ;
   }
-#ifdef IMPROVED_SMEARING
-  if( GLU_malloc( (void**)&lat3 , ALIGNMENT , 2 * LCU * sizeof( struct spt_site ) )   != 0 ||
-      GLU_malloc( (void**)&lat4 , ALIGNMENT , 2 * LCU * sizeof( struct spt_site ) )   != 0 ) {
-    fprintf( stderr , "[SMEARING] allocation failure \n" ) ;
-    return GLU_FAILURE ;
-  }
-#else
-  if( GLU_malloc( (void**)&lat3 , ALIGNMENT , LCU * sizeof( struct spt_site ) )   != 0 ||
-      GLU_malloc( (void**)&lat4 , ALIGNMENT , LCU * sizeof( struct spt_site ) )   != 0 ) {
-    fprintf( stderr , "[SMEARING] allocation failure \n" ) ;
-    return GLU_FAILURE ;
-  }
-#endif
-  init_navig( lat_two ) ;
 
   // set up the step sizes ...
   double delta_t = SIGN * Latt.sm_alpha[0] ;
@@ -214,14 +182,14 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
   // counters for the derivative ...
   double yscal = curr -> avplaq , t = 0.0 ;
   double flow = 0. , flow_next = 0. ;
-  size_t count = 0 , OK_STEPS = 0 , NOTOK_STEPS = 0 ; 
+  size_t count = 0 , OK_STEPS = 0 , NOTOK_STEPS = 0 , meas_count = 0 ; 
 
   // have a flag for whether we mess up
   int FLAG = GLU_FAILURE ;
 
   // loop up to smiters
   for( count = 1 ; count <= smiters ; count++ ) { 
-    curr = (struct wfmeas*)malloc( sizeof( struct wfmeas ) ) ;
+
     size_t counter = 0 ;
     double errmax = 10. ;
     double new_plaq = 0. ;
@@ -230,7 +198,10 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
     while( ( errmax > 1.0 ) && ( counter < ADAPTIVE_BIG_NUMBER ) ) {
       #pragma omp parallel for private(i)
       PFOR( i = 0 ; i < LVOLUME ; i++ ) {
-	memcpy( &lat_two[i] , &lat[i] , sizeof( struct site ) ) ; 
+	register size_t mu ;
+	for( mu = 0 ; mu < ND ; mu++ ) {
+	  equiv( lat_two[i].O[mu] , lat[i].O[mu] ) ;
+	}
       }
 
       // Step forward in two halves ...
@@ -247,7 +218,10 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
 
       #pragma omp parallel for private(i)
       PFOR( i = 0 ; i < LVOLUME ; i++ ) {
-	memcpy( &lat_two[i] , &lat[i] , sizeof( struct site ) ) ; 
+	register size_t mu ;
+	for( mu = 0 ; mu < ND ; mu++ ) {
+	  equiv( lat_two[i].O[mu] , lat[i].O[mu] ) ;
+	}
       } 
 
       // and step forward twice and write into lat_two
@@ -266,7 +240,10 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
       // compute the error I will use the average plaquette ...
       new_plaq = (double)av_plaquette( lat_two ) ;
 
-      errmax = fabsl( ( new_plaq - old_plaq ) / ( yscal ) ) ;
+      // so the problem is that at large t the plaquettes become very close so the 
+      // step gets pretty wild. My way of compensating this is just to multiply by t^2
+      // this is in some sense tuning the stepsize for the quantity t^2 E^2
+      errmax = fabsl( (t+delta_t)*(t+delta_t) * ( new_plaq - old_plaq ) / ( yscal ) ) ;
       errmax /= ADAPTIVE_EPS ;
 
       // Break the while loop if conditions are satisfied
@@ -303,27 +280,44 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
     // overwrite lat .. 
 #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LVOLUME ; i++ ) {
-      memcpy( &lat[i] , &lat_two[i] , sizeof( struct site ) ) ; 
+      size_t mu ;
+      for( mu = 0 ; mu < ND ; mu++ ) {
+	equiv( lat[i].O[mu] , lat_two[i].O[mu] ) ;
+      }
     }
-    t += delta_t ; // add one time step to the overall time 
+    t += delta_t ; // add one time step to the overall time
 
-    curr -> time = t ;
-    // update the linked list
-    curr -> Gt = curr -> time * curr -> time * 
-      lattice_gmunu( lat , &(curr -> qtop) , &( curr->avplaq ) ) ;
+#ifndef WFLOW_TIME_ONLY
+    double wapprox = 0.0 ;
+#endif
+    if( t > WFLOW_MEAS_START ) {
 
-    // set the flow
-    flow_next = curr -> Gt ;
+      curr = (struct wfmeas*)malloc( sizeof( struct wfmeas ) ) ;
 
-    print_flow( curr , errmax * ADAPTIVE_EPS , delta_t ) ;
+      curr -> time = t ;
+      
+      // update the linked list
+      curr -> Gt = curr -> time * curr -> time * 
+	lattice_gmunu( lat , &(curr -> qtop) , &( curr->avplaq ) ) ;
 
-    // update the linked list
-    curr -> next = head ;
-    head = curr ;
+      // set the flow
+      flow_next = curr -> Gt ;
 
-    // approximate the derivative
-    double wapprox = ( flow_next - flow ) * curr -> time / delta_t ;
-    flow = flow_next ;
+      print_flow( curr , errmax * ADAPTIVE_EPS , delta_t ) ;
+
+      // update the linked list
+      curr -> next = head ;
+      head = curr ;
+
+      // approximate the derivative
+      #ifndef WFLOW_TIME_ONLY
+      wapprox = flow != 0.0 ? ( flow_next - flow ) * curr -> time / delta_t : 0.0 ;
+      #endif
+      
+      flow = flow_next ;
+
+      meas_count++ ;
+    }
 
     // If we get stuck in a rut of updating by zero we leave
     if( fabs( delta_t ) < DBL_MIN ) {
@@ -332,6 +326,7 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
       goto memfree ;
     }
 
+#ifndef WFLOW_TIME_ONLY
     // perform fine measurements around T0_STOP for t_0
     if( fabs( T0_STOP - flow ) <= ( T0_STOP * FINETWIDDLE ) ) {
       while( fabs( T0_STOP - flow ) <= ( T0_STOP * FINETWIDDLE ) ) {
@@ -343,6 +338,7 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
 	curr -> next = head ;
 	head = curr ;
 	count++ ;
+	meas_count++ ;
       }
     }
 
@@ -357,6 +353,7 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
 	curr -> next = head ;
 	head = curr ;
 	count++ ;
+	meas_count++ ;
       }
     }
 
@@ -364,14 +361,16 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
     if( wapprox > ( W0_STOP * 1.5 ) ) {
       break ;
     }
+#endif
 
     // stop if we are above the max time
-    if( ( curr -> time ) > TMEAS_STOP ) {
-      delta_t = TMEAS_STOP - t ;
+    if( t > WFLOW_TIME_STOP ) {
+      delta_t = WFLOW_TIME_STOP - t ;
       curr = fine_measurement( lat , lat2 , lat3 , lat4 , Z , 
 			       &flow_next , &t , delta_t , 
 			       errmax * ADAPTIVE_EPS , SM_TYPE , project ) ;
       count++ ;
+      meas_count++ ;
       curr -> next = head ;
       head = curr ;
       break ;
@@ -390,12 +389,18 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
   fprintf( stdout , "\n[WFLOW] Inadequate steps :: %zu \n" , NOTOK_STEPS ) ;
   fprintf( stdout , "[WFLOW] Adequate steps :: %zu \n" , OK_STEPS ) ;
 
-  // compute the t_0 and w_0 scales from the measurement
-  if( ( fabs( curr -> time - TMEAS_STOP ) > PREC_TOL ) && 
-      count <= smiters ) {
-    scaleset( curr , T0_STOP , W0_STOP , count ) ;
-  }
+  fprintf( stdout , "[WFLOW] Iterations :: %zu || Measurements :: %zu\n" ,
+	   count , meas_count ) ;
 
+  // compute the t_0 and w_0 scales from the measurement
+#ifndef WFLOW_TIME_ONLY
+  if( ( fabs( curr -> time - WFLOW_TIME_STOP ) > PREC_TOL ) && 
+      count <= smiters &&
+      meas_count > 0 ) {
+    scaleset( curr , T0_STOP , W0_STOP , meas_count ) ;
+  }
+#endif
+  
   // we are successful
   FLAG = GLU_SUCCESS ;
 
@@ -408,16 +413,17 @@ flow4d_adaptive_RK( struct site *__restrict lat ,
   }
   
   // free our fields
-  free( Z ) ;
-  free( lat2 ) ;
-  free( lat3 ) ;
-  free( lat4 ) ;
-  free( lat_two ) ;
+  free_s_site( Z , LVOLUME , ND , TRUE_HERM ) ;
+#if IMPROVED_SMEARING
+  free_s_site( lat2 , 2*LCU , ND , NCNC ) ;
+  free_s_site( lat3 , 2*LCU , ND , NCNC ) ;
+  free_s_site( lat4 , 2*LCU , ND , NCNC ) ;
+#else
+  free_s_site( lat2 , LCU , ND , NCNC ) ;
+  free_s_site( lat3 , LCU , ND , NCNC ) ;
+  free_s_site( lat4 , LCU , ND , NCNC ) ;
+#endif
+  free_lat( lat_two ) ;
 
   return FLAG ;
 }
-
-// if we have set the code in "TIME_ONLY" mode we make sure we clean it up
-#ifdef TIME_ONLY
-  #undef TIME_ONLY
-#endif

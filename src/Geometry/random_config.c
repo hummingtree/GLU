@@ -23,7 +23,7 @@
 
 #include "Mainfile.h"
 
-#include "GLU_rng.h"      // for generate_NCxNC()
+#include "par_rng.h"      // for generate_NCxNC()
 #include "gramschmidt.h"  // orthogonalisation
 #include "gtrans.h"       // gauge transformations
 
@@ -39,7 +39,7 @@ latt_reunitg( GLU_complex *__restrict *__restrict gauge )
   return ;
 }
 
-//lattice reunitarization for lattice links
+//lattice reunitarization for the links
 void 
 latt_reunitU( struct site *__restrict lat )
 {
@@ -58,8 +58,8 @@ latt_reunitU( struct site *__restrict lat )
 void 
 random_gtrans( struct site *__restrict lat )
 {
-  rng_init(  ) ; 
-  
+  initialise_par_rng( NULL ) ; 
+ 
   fprintf( stdout , "\n[RNG] Performing a RANDOM gauge transformation \n" ) ;
 
   GLU_complex **gauge = NULL ;
@@ -68,47 +68,36 @@ random_gtrans( struct site *__restrict lat )
     fprintf( stdout , "[RANDOM] Allocation failed \n" ) ;
   }
 
-  size_t i ; 
+  size_t i ;
+#pragma omp parallel for private(i)
   for( i = 0 ; i < LVOLUME ; i++ ) {
     GLU_malloc( (void**)&gauge[i] , ALIGNMENT , NCNC * sizeof( GLU_complex ) ) ;
-    // openmp does not play nice with static arrays in the WELL and MWC_1038
-    generate_NCxNC( gauge[i] ) ;
-    #if NC > 5 && ( ( defined HAVE_GSL ) || ( defined HAVE_LAPACKE_H ) )
-    GLU_complex A[ NCNC ] GLUalign ;
-    Hermitian_proj( A , gauge[i] ) ;
-    exponentiate( gauge[i] , A ) ;
-    #else
-    gram_reunit( gauge[i] ) ;
-    #endif
+    Sunitary_gen( gauge[i] , get_GLU_thread( ) ) ;
   }
+
   gtransform( lat , (const GLU_complex **)gauge ) ; 
+
 #pragma omp parallel for private(i)
   PFOR( i = 0 ; i < LVOLUME ; i++ ) { 
-    size_t mu ;
-    for( mu = 0 ; mu < ND ; mu++ ) {
-      gram_reunit( lat[i].O[mu] ) ; 
-    }
-   free( gauge[i] ) ;
+    free( gauge[i] ) ;
   }
   free( gauge ) ;
 
   return ;
 }
 
-// randomly gauge transform a slice
+// randomly generate a new gauge transform slice
 void
 random_gtrans_slice( GLU_complex *__restrict *__restrict slice_gauge )
 {
-  rng_init( ) ; 
+  initialise_par_rng( NULL ) ; 
+
   size_t i ;
-  // openmp does not play nice with RNG
-  for( i = 0 ; i < LCU ; i ++  ) {
-    generate_NCxNC( slice_gauge[i] ) ;
-  } 	      
   #pragma omp parallel for private(i)
-  PFOR( i = 0 ; i < LCU ; i ++  ) {
-    gram_reunit( slice_gauge[i] ) ;
+  for( i = 0 ; i < LCU ; i ++  ) {
+    Sunitary_gen( slice_gauge[i] , get_GLU_thread( ) ) ;
   }
+  
   return ;
 }
 
@@ -117,15 +106,12 @@ void
 random_transform( struct site *__restrict lat ,
 		  GLU_complex *__restrict *__restrict gauge )
 {
+  initialise_par_rng( NULL ) ; 
+
   size_t i ; 
-  rng_init( ) ; 
-  // openmp does not play nice with RNG
-  for( i = 0 ; i < LVOLUME ; i++ ) {
-    generate_NCxNC( gauge[i] ) ;
-  }
   #pragma omp parallel for private(i)
   PFOR( i = 0 ; i < LVOLUME ; i++ ) {
-    gram_reunit( gauge[i] ) ;
+    Sunitary_gen( gauge[i] , get_GLU_thread( ) ) ;
   }
   gtransform( lat , (const GLU_complex **)gauge ) ; 
   return ;
@@ -135,20 +121,16 @@ random_transform( struct site *__restrict lat ,
 void 
 random_suNC( struct site *__restrict lat )
 {
+  initialise_par_rng( NULL ) ; 
+
   size_t i ;
-  rng_init(  ) ; 
   // openmp does not play nice with RNG
+#pragma omp parallel for private(i)
   for( i = 0 ; i < LVOLUME ; i++ ) {
+    uint32_t thread = get_GLU_thread( ) ;
     size_t mu ;
     for( mu = 0 ; mu < ND ; mu++ ) {
-      generate_NCxNC( lat[i].O[mu] ) ;
-    }
-  }
-  #pragma omp parallel for private(i)
-  PFOR( i = 0 ; i < LVOLUME ; i++ ) {      
-    size_t mu ;
-    for( mu = 0 ; mu < ND ; mu++ ) {
-      gram_reunit( lat[i].O[mu] ) ;
+      Sunitary_gen( lat[i].O[mu] , thread ) ;
     }
   }
   return ;

@@ -29,6 +29,7 @@
 #include "cut_routines.h"  // momentum cuts
 #include "cut_output.h"    // output file
 #include "geometry.h"      // general geometry for the p-calcs
+#include "init.h"          // init_navig()
 #include "plan_ffts.h"     // FFTW plan wrappers
 #include "plaqs_links.h"   // plaquettes and links calculations
 #include "pspace_landau.h" // momentum space Landau correction
@@ -77,7 +78,7 @@ mom_gauge( struct site *__restrict A ,
   GLU_complex *in = fftw_malloc( LVOLUME * sizeof( GLU_complex ) ) ;
 
   fftw_plan forward , backward ;
-  small_create_plans_DFT( &forward , &backward , in , out , ND ) ;
+  small_create_plans_DFT( &forward , &backward , in , out , Latt.dims , ND ) ;
 
   // do the FFTs
   size_t mu , j ;

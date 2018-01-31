@@ -27,7 +27,7 @@
 
 // and the other headers it uses
 #include "geometry.h"
-#include "GLU_rng.h"
+#include "par_rng.h"
 #include "GLU_timer.h"
 #include "plan_ffts.h"
 #include "U1_obs.h"
@@ -88,7 +88,9 @@ periodic_dft( GLU_complex *__restrict *__restrict fields )
 
   size_t i ;
   // openmp does not play nice with the rng
+#pragma omp parallel for private(i)
   for( i = 0 ; i < SYMM_POINT ; i++ ) {
+    const uint32_t thread = get_GLU_thread( ) ;
     if( likely( count[i] == CONJUGATE_NOT_IN_LIST ) ) {
       count[i] = CONJUGATE_IN_LIST; // set the element of the list to 1
       const size_t b = conjugate_site( i ) ;
@@ -96,21 +98,21 @@ periodic_dft( GLU_complex *__restrict *__restrict fields )
       if( unlikely( i == b ) ) {
         #if ND%2 == 0
 	for( mu = 0 ; mu < ND ; mu+=2 ) {
-	  register const GLU_complex cache = polar_box() ;
+	  register const GLU_complex cache = par_polar_box( thread ) ;
 	  fields[mu  ][i] = creal( cache ) ;
 	  fields[mu+1][i] = cimag( cache ) ;
 	}
         #else
-	fields[0][i] = creal( polar_box() ) ;
+	fields[0][i] = creal( par_polar_box( thread ) ) ;
 	for( mu = 1 ; mu < ND ; mu+=2 ) {
-	  register const GLU_complex cache = polar_box() ;
+	  register const GLU_complex cache = par_polar_box( thread ) ;
 	  fields[mu  ][i] = creal( cache ) ;
 	  fields[mu+1][i] = cimag( cache ) ;
 	}
         #endif
       } else {
 	for( mu = 0 ; mu < ND ; mu++ ) {
-	  register const GLU_complex cache = polar_box() ;
+	  register const GLU_complex cache = par_polar_box( thread ) ;
 	  fields[mu][i] = cache ;
 	  fields[mu][b] = conj( cache ) ;
 	}
@@ -140,8 +142,9 @@ periodic_dht( GLU_real *__restrict *__restrict fields )
   int *count = calloc( SYMM_POINT , sizeof(int) ) ; // set up a counter
 
   size_t i ;
-  // openmp does not play nice with rngs so I don't call it here
+#pragma omp parallel for private(i)
   for( i = 0 ; i < SYMM_POINT ; i++ ) {
+    const uint32_t thread = get_GLU_thread( ) ;
     if( likely( count[i] == CONJUGATE_NOT_IN_LIST ) ) {
       count[i] = CONJUGATE_IN_LIST ; // set the element of the list to 1
       // get the momenta at "i" in the -pi to pi BZ 
@@ -149,14 +152,14 @@ periodic_dht( GLU_real *__restrict *__restrict fields )
       size_t mu ;
       #if ND%2 == 0
       for( mu = 0 ; mu < ND ; mu += 2 ) {
-	register const GLU_complex cache = r2 * polar_box() ;
+	register const GLU_complex cache = r2 * par_polar_box( thread ) ;
 	fields[ mu ][ i ] = fields[ mu ][ b ] = creal( cache ) ;
 	fields[ mu + 1 ][ i ] = fields[ mu + 1 ][ b ] = cimag( cache ) ;
       }
       #else
-      fields[ 0 ][ i ] = fields[ 0 ][ b ] = r2 * creal( polar_box() ) ;
+      fields[ 0 ][ i ] = fields[ 0 ][ b ] = r2 * creal( par_polar_box( thread ) ) ;
       for( mu = 1 ; mu < ND ; mu += 2 ) {
-	register const GLU_complex cache = r2 * polar_box() ;
+	register const GLU_complex cache = r2 * par_polar_box( thread ) ;
 	fields[ mu ][ i ]     = fields[ mu ][ b ]     = creal( cache ) ;
 	fields[ mu + 1 ][ i ] = fields[ mu + 1 ][ b ] = cimag( cache ) ;
       }
@@ -203,7 +206,7 @@ create_u1( GLU_real *__restrict *__restrict U ,
   start_timer( ) ;
 
   // initialise the rng
-  rng_init() ;
+  initialise_par_rng( NULL ) ;
 
 #ifdef U1_DHT
 
@@ -217,7 +220,7 @@ create_u1( GLU_real *__restrict *__restrict U ,
   }
 
   fftw_plan plan[ ND ] ;
-  create_plans_DHT( plan , in , out , ND , ND ) ;
+  create_plans_DHT( plan , in , out , Latt.dims , ND , ND ) ;
 
   periodic_dht( in ) ;
 
@@ -233,7 +236,7 @@ create_u1( GLU_real *__restrict *__restrict U ,
   }
   
   fftw_plan plan[ ND ] , backward[ ND ] ;
-  create_plans_DFT( plan , backward , in , out , ND , ND ) ;
+  create_plans_DFT( plan , backward , in , out , Latt.dims , ND , ND ) ;
 
   periodic_dft( in ) ;
 
@@ -271,15 +274,14 @@ create_u1( GLU_real *__restrict *__restrict U ,
   }
 
   // fft the fields allow for the parallel omp-ified fftws
+  size_t mu ;
 #ifdef OMP_FFTW
-  static size_t mu ;
   for( mu = 0 ; mu < ND ; mu++ ) {
     PSPAWN fftw_execute( plan[ mu ] ) ;
   }
   PSYNC ;
 #else
-  static size_t mu ;
-#pragma omp parallel for private(mu) 
+  #pragma omp parallel for private(mu) 
   for( mu = 0 ; mu < ND ; mu++ ) {
     PSPAWN fftw_execute( plan[ mu ] ) ;
   }
