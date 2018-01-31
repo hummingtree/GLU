@@ -105,8 +105,14 @@
 /* Generated Gribov copies. */
 #undef LUXURY_GAUGE
 
-/* Multiply With Carry (4096) selection */
+/* Multiply With Carry (1038) selection */
 #undef MWC_1038_RNG
+
+/* Multiply With Carry (4096) selection */
+#undef MWC_4096_RNG
+
+/* No loop unrolling. */
+#undef NBLOCK
 
 /* Compiled for SU(NC) */
 #undef NC
@@ -169,6 +175,18 @@
 /* Version number of package */
 #undef VERSION
 
+/* Well (512) rng selection */
+#undef WELL_512_RNG
+
+/* Wflow observable measurements start from here */
+#undef WFLOW_MEAS_START
+
+/* Only timing the gradient flow */
+#undef WFLOW_TIME_ONLY
+
+/* Wilson flow maximum time stopping condition. */
+#undef WFLOW_TIME_STOP
+
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -180,6 +198,9 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* XOR (1024) selection */
+#undef XOR_1024_RNG
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const

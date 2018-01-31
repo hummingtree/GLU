@@ -821,13 +821,6 @@ Coulomb_FASD( struct site  *__restrict lat ,
     gram_reunit( g[i] ) ; 
   }
 
-	#pragma omp parallel for private(i) 
-	PFOR( i = 0 ; i < LCU ; i++ ) { 
-	  memcpy( (void*)( gt_matrices + (0*LCU+i)*NCNC ), (void*)g_end[i], NCNC*sizeof(GLU_complex) ); 
-	  memcpy( (void*)( gt_matrices + (1*LCU+i)*NCNC ), (void*)g[i], NCNC*sizeof(GLU_complex) ); 
-	}
-
-
   //gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
   gtransform_slice( (const GLU_complex**)g_end , lat , 
 		    (const GLU_complex**)g , t ) ; 
@@ -847,11 +840,6 @@ Coulomb_FASD( struct site  *__restrict lat ,
     // reunitarise the working gauge trans matrices to counteract the accumulated round-off error
     #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i++ ) { gram_reunit( g_up[i] ) ; }
-
-		#pragma omp parallel for private(i) 
-		PFOR( i = 0 ; i < LCU ; i++ ) { 
-		  memcpy( (void*)( gt_matrices + (t*LCU+i)*NCNC ), (void*)g_up[i], NCNC*sizeof(GLU_complex) ); 
-		}
     
 	//gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
     gtransform_slice( (const GLU_complex**)g , lat , 
