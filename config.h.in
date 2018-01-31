@@ -12,9 +12,6 @@
 /* DBW2 improved staple. */
 #undef DBW2
 
-/* Enables faster and innaccurate smearing routines */
-#undef FAST_SMEAR
-
 /* Trace maximisation routine for APE projection. */
 #undef GIVENS_APE
 
@@ -38,6 +35,9 @@
 
 /* Define to 1 if you have the <gsl/gsl_eigen.h> header file. */
 #undef HAVE_GSL_GSL_EIGEN_H
+
+/* Define to 1 if you have the <immintrin.h> header file. */
+#undef HAVE_IMMINTRIN_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -118,6 +118,9 @@
    */
 #undef NOT_CONDOR_MODE
 
+/* Define to 1 if your C compiler doesn't accept -c and -o together. */
+#undef NO_MINUS_C_MINUS_O
+
 /* OpenMP-parallel FFT routines. */
 #undef OMP_FFTW
 
@@ -144,6 +147,9 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Plaquette field strength tensor. */
+#undef PLAQUETTE_FMUNU
 
 /* Nonexceptional projection index. */
 #undef PROJ_GRACEY

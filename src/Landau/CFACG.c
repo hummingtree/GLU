@@ -31,6 +31,9 @@
 #include "plaqs_links.h"   // plaquette routine might be called
 #include "random_config.h" // for the random transformed gauge slices
 
+#include <stdio.h>
+#include <string.h>
+
 // these are the steps I choose, I need 5 points for the high-order cubic spline
 // they DO NOT have to be evenly spaced, but DO have to be sorted
 #define LINE_NSTEPS 3
@@ -458,6 +461,20 @@ steep_fix_FACG( const struct site *__restrict lat ,
   return iters + temp_iters ;
 }
 
+static uint32_t
+nersc_checksum(void* p, size_t length){
+	const uint32_t* data = (const uint32_t*)p;
+	size_t size = length / sizeof(uint32_t);
+	uint32_t sum = 0;
+	size_t i;
+// #pragma omp parallel for private(i) reduction(+:sum)
+	for(i = 0; i < size; i++){
+		sum += data[i];
+	}
+	printf("[GF]: gauge fixing matrices checksum = %08x, length = %012d\n", sum, length);
+	return sum;
+}
+
 // Fourier accelerated CG code is here
 size_t
 Coulomb_FACG( struct site  *__restrict lat , 
@@ -485,6 +502,13 @@ Coulomb_FACG( struct site  *__restrict lat ,
 
   // loop counter and timeslice number
   size_t i , t = 0 ;
+
+	// TODO: Added by Jackson. We want the gauge transformation matrices.
+	printf("[GF] Started allocating space for gauge fixing matrices.\n");
+	long gt_size = Latt.dims[ND-1] * LCU * NCNC;
+	printf("[GF] Allocating size = %d.\n", gt_size*sizeof(GLU_complex));
+	GLU_complex* gt_matrices = (GLU_complex*)malloc( gt_size*sizeof(GLU_complex) );
+	printf("[GF] Finished allocating space for gauge fixing matrices.\n");
 
   // temporary field allocations
   if( GLU_malloc( (void**)&gt     , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
@@ -531,6 +555,12 @@ Coulomb_FACG( struct site  *__restrict lat ,
     gram_reunit( g_end[i] ) ; 
     gram_reunit( g[i] ) ; 
   }
+	
+	#pragma omp parallel for private(i) 
+	PFOR( i = 0 ; i < LCU ; i++ ) { 
+	  memcpy( (void*)( gt_matrices + (0*LCU+i)*NCNC ), (void*)g_end[i], NCNC*sizeof(GLU_complex) ); 
+	  memcpy( (void*)( gt_matrices + (1*LCU+i)*NCNC ), (void*)g[i], NCNC*sizeof(GLU_complex) ); 
+	}
 
   //gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
   gtransform_slice( (const GLU_complex **)g_end , lat , 
@@ -552,6 +582,11 @@ Coulomb_FACG( struct site  *__restrict lat ,
     #pragma omp parallel for private(i) 
     PFOR( i = 0 ; i < LCU ; i++ ) { gram_reunit( g_up[i] ) ; }
 
+		#pragma omp parallel for private(i) 
+		PFOR( i = 0 ; i < LCU ; i++ ) { 
+		  memcpy( (void*)( gt_matrices + (t*LCU+i)*NCNC ), (void*)g_up[i], NCNC*sizeof(GLU_complex) ); 
+		}
+ 
     //gauge transform the links for this slice "g"
     gtransform_slice( (const GLU_complex **)g , lat , 
 		      (const GLU_complex **)g_up , t - 1 ) ; 
@@ -566,6 +601,43 @@ Coulomb_FACG( struct site  *__restrict lat ,
   // gauge transform the very final slice
   gtransform_slice( (const GLU_complex **)g , lat , 
 		    (const GLU_complex **)g_end , t - 1 ) ; 
+
+	char gt_matrices_stem[1024];
+	sprintf(gt_matrices_stem, "gf_matrices_COULOMB.%d", Latt.flow);
+	printf("[GF] Coulomb gauge fixing matrices output to %s\n", gt_matrices_stem);
+	FILE* gt_matrices_output = fopen(gt_matrices_stem, "w");
+	fprintf(gt_matrices_output, "BEGIN_HEADER\n");
+	fprintf(gt_matrices_output, "HDR_VERSION = 1.0\n");
+	fprintf(gt_matrices_output, "STORAGE_VERSION = 1.0\n");
+	fprintf(gt_matrices_output, "DIMENSION_1 = %d\n", Latt.dims[0]);
+	fprintf(gt_matrices_output, "DIMENSION_2 = %d\n", Latt.dims[1]);
+	fprintf(gt_matrices_output, "DIMENSION_3 = %d\n", Latt.dims[2]);
+	fprintf(gt_matrices_output, "DIMENSION_4 = %d\n", Latt.dims[3]);
+	fprintf(gt_matrices_output, "CHECKSUM = %08x\n", nersc_checksum((void*)gt_matrices, gt_size*sizeof(GLU_complex))); // Do Checksum!!!
+	
+	swap_for_output((GLU_real*)gt_matrices, gt_size*sizeof(GLU_complex)/sizeof(GLU_real));
+
+#ifdef SINGLE_PREC
+   #ifdef OUT_BIG
+      fprintf( gt_matrices_output , "FLOATING_POINT = IEEE32BIG\n" ) ; 
+   #else
+      fprintf( gt_matrices_output , "FLOATING_POINT = IEEE32LITTLE\n" ) ; 
+   #endif
+#else
+   #ifdef OUT_BIG
+      fprintf( gt_matrices_output , "FLOATING_POINT = IEEE64BIG\n" ) ; 
+   #else
+      fprintf( gt_matrices_output , "FLOATING_POINT = IEEE64LITTLE\n" ) ; 
+   #endif
+#endif		
+	fprintf(gt_matrices_output, "DATA_PER_SITE = 18\n");
+	fprintf(gt_matrices_output, "GF_TYPE = COULOMB\n");
+	fprintf(gt_matrices_output, "GF_TYPE_ACCURACY = %12.8E\n", accuracy);
+	fprintf(gt_matrices_output, "END_HEADER\n");
+//	byteswap_and_write(gt_matrices_output, (GLU_real*)gt_matrices, gt_size*sizeof(GLU_complex)/sizeof(GLU_real));
+	fwrite((void*)gt_matrices, gt_size*sizeof(GLU_complex), 1, gt_matrices_output);
+	fclose(gt_matrices_output);
+	free(gt_matrices);	
 
   // and free all of that memory, especially rotato
  memfree :
@@ -709,6 +781,12 @@ Coulomb_FASD( struct site  *__restrict lat ,
   // initialise loop counter and timeslice index
   size_t i , t = 0 ;
 
+	// TODO: Added by Jackson. We want the gauge transformation matrices.
+	printf("Allocating space for gauge fixing matrices.\n");
+	long gt_size = Latt.dims[ND-1] * LCU * NCNC;
+	GLU_complex gt_matrices[gt_size];
+
+
   // allocate temporary gauge transformation matrices
   if( GLU_malloc( (void**)&g      , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
       GLU_malloc( (void**)&g_end  , ALIGNMENT , LCU * sizeof( GLU_complex* ) ) != 0 ||
@@ -745,6 +823,13 @@ Coulomb_FASD( struct site  *__restrict lat ,
     gram_reunit( g[i] ) ; 
   }
 
+	#pragma omp parallel for private(i) 
+	PFOR( i = 0 ; i < LCU ; i++ ) { 
+	  memcpy( (void*)( gt_matrices + (0*LCU+i)*NCNC ), (void*)g_end[i], NCNC*sizeof(GLU_complex) ); 
+	  memcpy( (void*)( gt_matrices + (1*LCU+i)*NCNC ), (void*)g[i], NCNC*sizeof(GLU_complex) ); 
+	}
+
+
   //gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
   gtransform_slice( (const GLU_complex**)g_end , lat , 
 		    (const GLU_complex**)g , t ) ; 
@@ -765,7 +850,12 @@ Coulomb_FASD( struct site  *__restrict lat ,
     #pragma omp parallel for private(i)
     PFOR( i = 0 ; i < LCU ; i++ ) { gram_reunit( g_up[i] ) ; }
 
-    //gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
+		#pragma omp parallel for private(i) 
+		PFOR( i = 0 ; i < LCU ; i++ ) { 
+		  memcpy( (void*)( gt_matrices + (t*LCU+i)*NCNC ), (void*)g_up[i], NCNC*sizeof(GLU_complex) ); 
+		}
+    
+	//gauge transform the links at x -> then set slice_gauge_up to be slice_gauge
     gtransform_slice( (const GLU_complex**)g , lat , 
 		      (const GLU_complex**)g_up , t - 1 ) ; 
 
@@ -779,6 +869,13 @@ Coulomb_FASD( struct site  *__restrict lat ,
   gtransform_slice( (const GLU_complex**)g , lat , 
 		    (const GLU_complex**)g_end , t - 1 ) ; 
 
+	char gt_matrices_stem[1024];
+	sprintf(gt_matrices_stem, "gf_matrices_COULOMB.%d", Latt.flow);
+	printf("%s\n", gt_matrices_stem);
+	FILE* gt_matrices_output = fopen(gt_matrices_stem, "w");
+	fwrite((void*)gt_matrices, gt_size*sizeof(GLU_complex), 1, gt_matrices_output);
+	fclose(gt_matrices_output);
+ 
  memfree :
 
   // free the temporary transformation matrix, that I called rotato

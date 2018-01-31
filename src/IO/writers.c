@@ -44,7 +44,8 @@ typedef union {
 #endif
 
 // compute the checksum
-static uint32_t
+// static uint32_t
+uint32_t
 checksum( const GLU_real *__restrict p ,
 	  const size_t idx )
 {
@@ -131,7 +132,8 @@ grab_sitedata( GLU_real *__restrict chunk ,
 }
 
 // byteswap for output
-static void
+// static void
+void
 swap_for_output( GLU_real *uout , 
 		 const size_t SIZE )
 {
@@ -225,7 +227,8 @@ compute_checksum( uint32_t *nersc_cksum ,
 }
 
 // can write in big or little endian, overwrites uout!
-static void
+//static void
+void
 byteswap_and_write( FILE *__restrict outfile ,
 		    GLU_real *__restrict uout ,
 		    const size_t SIZE )
