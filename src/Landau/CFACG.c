@@ -634,7 +634,7 @@ Coulomb_FACG( struct site  *__restrict lat ,
 #endif		
 	fprintf(gt_matrices_output, "DATA_PER_SITE = 18\n");
 	fprintf(gt_matrices_output, "GF_TYPE = COULOMB\n");
-	fprintf(gt_matrices_output, "GF_TYPE_ACCURACY = %12.8E\n", accuracy);
+	fprintf(gt_matrices_output, "GF_ACCURACY = %d\n", -1*(int)log10(accuracy));
 	fprintf(gt_matrices_output, "END_HEADER\n");
 //	byteswap_and_write(gt_matrices_output, (GLU_real*)gt_matrices, gt_size*sizeof(GLU_complex)/sizeof(GLU_real));
 	fwrite((void*)gt_matrices, gt_size*sizeof(GLU_complex), 1, gt_matrices_output);
